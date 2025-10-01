@@ -1,12 +1,16 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  host: "sandbox.smtp.mailtrap.io",   // ambil dari Mailtrap
-  port: 2525,                         // biasanya 2525
+  host: "smtp.gmail.com",       // Gmail SMTP
+  port: 587,                    // STARTTLS
+  secure: false,                // true kalau pakai 465 SSL
   auth: {
-    user: "e886722d2daafa",       // ganti dengan user dari Mailtrap
-    pass: "11f0b34bc4892e",       // ganti dengan pass dari Mailtrap
+    user: "mulkiaziz0703@gmail.com", // email Gmail kamu
+    pass: "qpmo fjbcoxioualr"     // App Password 16 karakter, tanpa spasi
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 module.exports = transporter;
