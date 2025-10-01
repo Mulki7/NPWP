@@ -1,16 +1,12 @@
-// import express
+require('dotenv').config();
 const express = require('express');
 const app = express();
+const authRoutes = require('./routes/authRoutes');
 
-// atur port
+app.use(express.json()); // parse JSON
+
+// Routes
+app.use('/api/auth', authRoutes);
+
 const PORT = 3000;
-
-// route GET
-app.get('/', (req, res) => {
-  res.send('Hello Express JS 🚀');
-});
-
-// jalankan server
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
