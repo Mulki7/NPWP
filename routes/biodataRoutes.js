@@ -8,18 +8,18 @@ router.use(authMiddleware);
 
 
 // GET biodata milik user (JWT)
-router.get('/me', biodataController.getByUserId);
+router.get('/', biodataController.getByUserId);
 
 // POST create biodata milik user (JWT)
-router.post('/me', biodataController.create);
+router.post('/', biodataController.create);
 
 // PUT update biodata milik user (JWT)
-router.put('/me', biodataController.updateByUserId);
+router.put('/', biodataController.updateByUserId);
 
 // PATCH biodata milik user (JWT)
-router.patch('/me', biodataController.patchByUserId);
+router.patch('/', biodataController.patchByUserId);
 
 // DELETE biodata milik user (JWT)
-router.delete('/me', biodataController.deleteByUserId);
+router.delete('/', biodataController.deleteByUserId);
 
 module.exports = router;
