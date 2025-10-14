@@ -103,13 +103,13 @@ exports.patchByUserId = async (req, res) => {
     }
 };
 
-// DELETE biodata by user_id (JWT)
-exports.deleteByUserId = async (req, res) => {
+// DELETE biodata by id (admin only)
+exports.deleteById = async (req, res) => {
     try {
-        const user_id = req.user.id;
-        const biodata = await Biodata.getByUserId(user_id);
+        const { id } = req.params;
+        const biodata = await Biodata.getById(id);
         if (!biodata) return res.status(404).json({ message: 'Data tidak ditemukan' });
-        const affected = await Biodata.delete(biodata.id);
+        const affected = await Biodata.delete(id);
         res.json({ message: 'Biodata berhasil dihapus' });
     } catch (err) {
         res.status(500).json({ message: 'Gagal hapus biodata', error: err.message });

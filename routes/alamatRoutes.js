@@ -6,11 +6,13 @@ const alamatController = require('../controllers/alamatController');
 // Semua endpoint pakai JWT
 router.use(authMiddleware);
 
+const { adminOnly, adminOrUser } = require('../middleware/roleMiddleware');
+
 // Routes
-router.get('/', alamatController.getByUserId);
-router.post('/', alamatController.create);
-router.put('/', alamatController.updateByUserId);
-router.patch('/', alamatController.patchByUserId);
-router.delete('/', alamatController.deleteByUserId);
+router.get('/', adminOrUser, alamatController.getByUserId);
+router.post('/', adminOrUser, alamatController.create);
+router.put('/', adminOrUser, alamatController.updateByUserId);
+router.patch('/', adminOrUser, alamatController.patchByUserId);
+router.delete('/', adminOnly, alamatController.deleteByUserId);
 
 module.exports = router;

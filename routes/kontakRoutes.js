@@ -8,18 +8,20 @@ router.use(authMiddleware);
 
 // ==================== ROUTES ====================
 
+const { adminOnly, adminOrUser } = require('../middleware/roleMiddleware');
+
 // GET endpoints
-router.get('/', kontakController.getByUserId);
+router.get('/', adminOrUser, kontakController.getByUserId);
 
 // POST endpoints
-router.post('/', kontakController.create);
-router.post('/verify-email', kontakController.verifyEmail);
-router.post('/resend-email', kontakController.resendEmailCode);
+router.post('/', adminOrUser, kontakController.create);
+router.post('/verify-email', adminOrUser, kontakController.verifyEmail);
+router.post('/resend-email', adminOrUser, kontakController.resendEmailCode);
 
 // PUT/PATCH endpoints
-router.put('/', kontakController.update);
+router.put('/', adminOrUser, kontakController.update);
 
 // DELETE endpoints
-router.delete('/', kontakController.delete);
+router.delete('/', adminOnly, kontakController.delete);
 
 module.exports = router;

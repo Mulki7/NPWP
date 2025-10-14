@@ -6,12 +6,14 @@ const orangTerkaitController = require('../controllers/orangTerkaitController');
 // Semua endpoint pakai JWT
 router.use(authMiddleware);
 
+const { adminOnly, adminOrUser } = require('../middleware/roleMiddleware');
+
 // Routes
-router.get('/', orangTerkaitController.getByUserId);
-router.post('/', orangTerkaitController.create);
+router.get('/', adminOrUser, orangTerkaitController.getByUserId);
+router.post('/', adminOrUser, orangTerkaitController.create);
 
 // Debug routes (hapus di production)
-router.get('/test-api', orangTerkaitController.testNikApi);
-router.get('/check-db', orangTerkaitController.checkDatabase);
+router.get('/test-api', adminOnly, orangTerkaitController.testNikApi);
+router.get('/check-db', adminOnly, orangTerkaitController.checkDatabase);
 
 module.exports = router;
