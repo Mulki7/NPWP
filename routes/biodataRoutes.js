@@ -7,19 +7,21 @@ const biodataController = require('../controllers/biodataController');
 router.use(authMiddleware);
 
 
+const { adminOnly, adminOrUser } = require('../middleware/roleMiddleware');
+
 // GET biodata milik user (JWT)
-router.get('/', biodataController.getByUserId);
+router.get('/', adminOrUser, biodataController.getByUserId);
 
 // POST create biodata milik user (JWT)
-router.post('/', biodataController.create);
+router.post('/', adminOrUser, biodataController.create);
 
 // PUT update biodata milik user (JWT)
-router.put('/', biodataController.updateByUserId);
+router.put('/', adminOrUser, biodataController.updateByUserId);
 
 // PATCH biodata milik user (JWT)
-router.patch('/', biodataController.patchByUserId);
+router.patch('/', adminOrUser, biodataController.patchByUserId);
 
-// DELETE biodata milik user (JWT)
-router.delete('/', biodataController.deleteByUserId);
+// DELETE biodata by id (admin only)
+router.delete('/:id', adminOnly, biodataController.deleteById);
 
 module.exports = router;
