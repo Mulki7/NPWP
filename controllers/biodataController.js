@@ -1,5 +1,59 @@
 const Biodata = require('../models/biodataModel');
 
+// PATCH status biodata (admin only)
+
+const User = require('../models/userModel');
+const generateNpwpCardPdf = require('../utils/generateNpwpCardPdf');
+const transporter = require('../config/email');
+
+exports.updateStatusById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        if (!['verified', 'rejected'].includes(status)) {
+            return res.status(400).json({ message: 'Status hanya boleh verified atau rejected' });
+        }
+        const biodata = await Biodata.getById(id);
+        if (!biodata) {
+            return res.status(404).json({ message: 'Data tidak ditemukan' });
+        }
+        await Biodata.update(id, { status });
+
+        // Jika status diverifikasi, generate PDF dan kirim email
+        if (status === 'verified') {
+            const user = await User.findById(biodata.user_id);
+            if (!user) {
+                return res.status(404).json({ message: 'User tidak ditemukan' });
+            }
+
+            // Generate PDF kartu NPWP (pakai util terpisah)
+            try {
+                const pdfData = await generateNpwpCardPdf(biodata, user);
+                await transporter.sendMail({
+                    from: 'NPWP App <no-reply@npwp.com>',
+                    to: user.email,
+                    subject: 'Kartu NPWP Digital',
+                    text: 'Berikut adalah kartu NPWP digital Anda.',
+                    attachments: [
+                        {
+                            filename: 'kartu-npwp.pdf',
+                            content: pdfData
+                        }
+                    ]
+                });
+                return res.json({ message: `Status biodata berhasil diubah menjadi ${status}, kartu NPWP telah dikirim ke email user.` });
+            } catch (emailErr) {
+                return res.status(500).json({ message: 'Status berhasil diubah, tapi gagal mengirim email kartu NPWP', error: emailErr.message });
+            }
+        }
+
+        // Jika bukan verified, langsung response
+        res.json({ message: `Status biodata berhasil diubah menjadi ${status}` });
+    } catch (err) {
+        return res.status(500).json({ message: 'Gagal update status biodata', error: err.message });
+    }
+}
+
 // GET all biodata
 exports.getAll = async (req, res) => {
     try {

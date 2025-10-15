@@ -21,6 +21,9 @@ router.put('/', adminOrUser, biodataController.updateByUserId);
 // PATCH biodata milik user (JWT)
 router.patch('/', adminOrUser, biodataController.patchByUserId);
 
+
+router.patch('/:id/status', adminOnly, biodataController.updateStatusById);
+
 // DELETE biodata by id (admin only)
 router.delete('/:id', adminOnly, biodataController.deleteById);
 

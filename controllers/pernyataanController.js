@@ -1,5 +1,6 @@
 const Pernyataan = require('../models/pernyataanModel');
 
+const Biodata = require('../models/biodataModel');
 
 // GET pernyataan milik user (JWT)
 exports.getByUser = async (req, res) => {
@@ -24,6 +25,11 @@ exports.create = async (req, res) => {
         const tanggal_submit = new Date();
         const data = { user_id, disetujui, tanggal_submit };
         const insertId = await Pernyataan.create(data);
+        // Update status biodata_npwp user ke 'submitted'
+        const biodata = await Biodata.getByUserId(user_id);
+        if (biodata) {
+            await Biodata.update(biodata.id, { status: 'submitted' });
+        }
         res.status(201).json({ message: 'Pernyataan berhasil disubmit', id: insertId });
     } catch (err) {
         res.status(500).json({ message: 'Gagal submit pernyataan', error: err.message });
