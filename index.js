@@ -9,6 +9,7 @@ const ekonomiRoutes = require('./routes/ekonomiRoutes');
 const alamatRoutes = require('./routes/alamatRoutes');
 const kontakRoutes = require('./routes/kontakRoutes');
 const orangTerkaitRoutes = require('./routes/orangTerkaitRoutes');
+const faceVerificationRoutes = require('./routes/faceVerificationRoutes');
 
 app.use(cors());
 app.use(express.json()); // parse JSON
@@ -21,6 +22,7 @@ app.use('/api/ekonomi', ekonomiRoutes);
 app.use('/api/alamat', alamatRoutes);
 app.use('/api/kontak', kontakRoutes);
 app.use('/api/orang-terkait', orangTerkaitRoutes);
+app.use('/api/face-verification', faceVerificationRoutes);
 
 
 // Auto-create admin account if not exists
