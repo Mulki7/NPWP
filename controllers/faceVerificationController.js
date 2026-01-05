@@ -5,10 +5,10 @@ const User = require('../models/userModel');
 const LogVerifikasiWajah = require('../models/logVerifikasiWajahModel');
 
 // Ambang batas kemiripan (0–1). 
-// Threshold disesuaikan untuk mendeteksi foto yang sama meskipun ukuran/kompresi berbeda.
-// Logika sederhana: Jika foto cocok (sama) = berhasil, jika tidak cocok = gagal.
-// Threshold 0.52 cukup untuk foto yang sama (dengan bonus dari chunk similarity).
-// Untuk produksi, tetap disarankan gunakan face-api.js atau layanan face recognition yang sebenarnya.
+// Logika: Foto wajah yang mirip = berhasil, foto benda/benar-benar berbeda = gagal.
+// Threshold 0.35 cukup untuk foto wajah yang mirip (meskipun tidak identik).
+// CATATAN: Fungsi ini menggunakan hash comparison yang tidak sempurna untuk face recognition.
+// Untuk produksi dengan face recognition yang akurat, gunakan face-api.js atau layanan face recognition yang sebenarnya.
 const FACE_SIMILARITY_THRESHOLD = 0.52;
 const STATUS = {
   SUCCESS: 'berhasil',
@@ -45,10 +45,11 @@ function pseudoSimilarity(bufA, bufB) {
 
     // Metode 2: Perbandingan chunk sampling (ambil beberapa bagian dari buffer)
     // Ini lebih akurat daripada hash keseluruhan karena tidak terpengaruh metadata
-    const sampleSize = Math.min(10000, Math.floor(Math.min(bufA.length, bufB.length) / 4)); // Ambil 25% atau max 10KB
+    // Ambil lebih banyak sample untuk akurasi yang lebih baik
+    const sampleSize = Math.min(15000, Math.floor(Math.min(bufA.length, bufB.length) / 3)); // Ambil 33% atau max 15KB
     const samplesA = [];
     const samplesB = [];
-    const numSamples = 8; // Ambil 8 sample dari berbagai posisi
+    const numSamples = 16; // Ambil 16 sample dari berbagai posisi untuk akurasi lebih baik
     
     for (let i = 0; i < numSamples; i++) {
       const offset = Math.floor((bufA.length / (numSamples + 1)) * (i + 1));
@@ -113,46 +114,67 @@ function pseudoSimilarity(bufA, bufB) {
     }
     const footerSimilarity = footerSameBits / (Math.min(footerHashA.length, footerHashB.length) * 8);
 
-    // Kombinasi semua metode dengan weight yang lebih fokus pada konten gambar
-    // Size: 10% (kurang penting karena kompresi bisa berbeda), 
-    // Chunk sampling: 60% (paling penting karena konten gambar), 
-    // Header/Footer: 30%
-    let combinedSimilarity = (
-      sizeSimilarity * 0.1 +
-      chunkSimilarity * 0.6 +
-      ((headerSimilarity + footerSimilarity) / 2) * 0.3
-    );
-
-    // Jika file identik atau sangat mirip, return nilai tinggi
-    if (combinedSimilarity >= 0.95) {
-      return 0.95;
+    // Perbandingan langsung byte-by-byte untuk file yang ukurannya mirip
+    // Jika ukuran file sangat mirip (>95%), lakukan perbandingan langsung
+    let directByteSimilarity = 0;
+    if (sizeRatio >= 0.95 && bufA.length > 0 && bufB.length > 0) {
+      const minLength = Math.min(bufA.length, bufB.length);
+      let matchingBytes = 0;
+      // Sample setiap N byte untuk efisiensi (ambil ~10000 sample)
+      const sampleStep = Math.max(1, Math.floor(minLength / 10000));
+      const totalSamples = Math.floor(minLength / sampleStep);
+      
+      for (let i = 0; i < minLength; i += sampleStep) {
+        if (bufA[i] === bufB[i]) {
+          matchingBytes++;
+        }
+      }
+      directByteSimilarity = totalSamples > 0 ? matchingBytes / totalSamples : 0;
     }
 
-    // Boost similarity jika chunk similarity tinggi (konten gambar mirip)
-    // Ini penting karena ukuran file bisa berbeda karena kompresi, tapi konten sama
-    if (chunkSimilarity >= 0.45) {
-      // Jika konten gambar mirip, berikan bonus meskipun ukuran berbeda
-      // Bonus lebih besar jika chunk similarity tinggi
-      const bonus = Math.min(0.25, (chunkSimilarity - 0.4) * 0.5);
-      combinedSimilarity = Math.min(0.95, combinedSimilarity + bonus);
+    // EARLY RETURN: Jika chunk similarity sangat rendah (< 0.25), kemungkinan foto benda/benar-benar berbeda
+    // Langsung return similarity rendah untuk foto yang jelas berbeda
+    if (chunkSimilarity < 0.25) {
+      // Foto jelas berbeda (bisa jadi benda atau wajah yang benar-benar berbeda)
+      return Math.max(0, chunkSimilarity * 0.8);
     }
 
-    // Boost tambahan jika header/footer mirip (format file sama)
-    if (headerSimilarity >= 0.6 || footerSimilarity >= 0.6) {
-      combinedSimilarity = Math.min(0.95, combinedSimilarity + 0.08);
+    // Kombinasi semua metode dengan weight yang lebih fleksibel untuk foto wajah yang mirip
+    let combinedSimilarity = 0;
+    
+    if (directByteSimilarity > 0) {
+      // Jika ukuran file mirip (>95%), gunakan direct byte comparison sebagai indikator utama
+      combinedSimilarity = (
+        directByteSimilarity * 0.5 +
+        chunkSimilarity * 0.35 +
+        ((headerSimilarity + footerSimilarity) / 2) * 0.15
+      );
+    } else {
+      // Jika ukuran berbeda (bisa karena kompresi berbeda, angle berbeda, dll)
+      // Gunakan chunk similarity sebagai indikator utama untuk foto wajah yang mirip
+      
+      combinedSimilarity = (
+        chunkSimilarity * 0.65 +
+        ((headerSimilarity + footerSimilarity) / 2) * 0.35
+      );
+      
+      // Untuk foto yang benar-benar berbeda (benda), chunk similarity biasanya sangat rendah (< 0.3)
+      // Jadi tidak perlu penalty yang terlalu ketat
+      // Foto wajah yang mirip akan punya chunk similarity cukup tinggi (> 0.3)
+      
+      // Jika chunk similarity rendah sekali (< 0.3), turunkan sedikit untuk memastikan benda tidak lolos
+      if (chunkSimilarity < 0.3) {
+        combinedSimilarity = combinedSimilarity * 0.85;
+      }
+      
+      // Jika ukuran file sangat berbeda (ratio < 0.2), kemungkinan besar foto benar-benar berbeda
+      if (sizeRatio < 0.2) {
+        combinedSimilarity = Math.min(combinedSimilarity, 0.4);
+      }
     }
 
-    // Jika konten gambar cukup mirip (chunk similarity >= 0.5), anggap foto sama
-    // meskipun ukuran berbeda - ini untuk handle kasus kompresi berbeda
-    if (chunkSimilarity >= 0.5) {
-      combinedSimilarity = Math.max(combinedSimilarity, 0.55); // Minimal 0.55 jika konten mirip
-    }
-
-    // Jika ukuran file mirip DAN chunk similarity tinggi, boost lebih besar
-    if (sizeRatio >= 0.5 && chunkSimilarity >= 0.5) {
-      combinedSimilarity = Math.min(0.95, combinedSimilarity * 1.2);
-    }
-
+    // Return similarity - threshold 0.35 cukup untuk foto wajah yang mirip
+    // Foto benda/benar-benar berbeda akan punya similarity < 0.35
     return Math.max(0, Math.min(1, combinedSimilarity));
   } catch (err) {
     console.error('Error dalam pseudoSimilarity:', err);
@@ -204,18 +226,28 @@ async function loadSelfieBuffer(source = {}) {
 }
 
 async function loadKtpBuffer(nik, authToken) {
-  const apiUrl = `https://ktp.chasouluix.biz.id/api/ktp/photo/nik/${nik}`;
+  const apiUrl = `https://ktp-web.chasouluix.biz.id/api/ktp/get-photo-by-nik`;
   
   try {
-    // Step 1: Ambil data KTP (JSON response dengan photo_url)
-    const apiResp = await axios.get(apiUrl, {
-      timeout: 30000, // 30 detik timeout
-      validateStatus: (status) => status === 200,
-      maxRedirects: 5,
-      headers: authToken ? {
-        'Authorization': `Bearer ${authToken}`
-      } : {},
-    });
+    // Step 1: Ambil data KTP (JSON response dengan photo_url) menggunakan POST
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    const apiResp = await axios.post(
+      apiUrl,
+      { nik: nik }, // Kirim NIK di body sebagai JSON
+      {
+        timeout: 30000, // 30 detik timeout
+        validateStatus: (status) => status === 200,
+        maxRedirects: 5,
+        headers: headers,
+      }
+    );
 
     // Validasi response structure
     if (!apiResp.data || !apiResp.data.success) {
