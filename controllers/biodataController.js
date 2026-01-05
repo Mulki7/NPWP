@@ -76,9 +76,16 @@ exports.getById = async (req, res) => {
     }
 };
 
-// GET biodata by user_id (from JWT)
+// GET biodata - Admin bisa lihat semua, User hanya milik sendiri
 exports.getByUserId = async (req, res) => {
     try {
+        // Jika admin, return semua data
+        if (req.user.role === 'admin') {
+            const allData = await Biodata.getAll();
+            return res.json(allData);
+        }
+        
+        // Jika user, return hanya data milik sendiri
         const user_id = req.user.id;
         const data = await Biodata.getByUserId(user_id);
         if (!data) return res.status(404).json({ message: 'Data tidak ditemukan' });
